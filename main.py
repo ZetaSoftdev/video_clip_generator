@@ -369,6 +369,12 @@ async def get_status(processing_id: str, db: Session = Depends(get_db)):
     # Add clips information if completed
     if job.status == "completed":
         clips = db.query(GeneratedClip).filter(GeneratedClip.job_id == job.id).all()
+        logger.info(f"🔍 Status API: Found {len(clips)} clips in database for job {job.id} (processing_id: {processing_id})")
+        if clips:
+            for clip in clips:
+                logger.info(f"   - Clip {clip.clip_number}: {clip.clip_filename}, caption: {clip.caption_filename}")
+        else:
+            logger.warning(f"⚠️  No clips found in database for completed job {job.id}")
         response["clips"] = [clip.to_dict() for clip in clips]
     
     # Add estimated remaining time
@@ -407,7 +413,8 @@ async def download_clip(processing_id: str, filename: str, db: Session = Depends
     if not clip:
         raise HTTPException(status_code=404, detail="Clip not found")
     
-    file_path = config.RESULTS_DIR / processing_id / filename
+    # FIXED: Look in clips_processing directory where files are actually saved
+    file_path = config.RESULTS_DIR / "clips_processing" / filename
     storage = StorageHandler()
     
     if config.STORAGE_TYPE == 's3':
@@ -424,11 +431,15 @@ async def download_clip(processing_id: str, filename: str, db: Session = Depends
     # Determine media type
     media_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
     
+    # Use streaming response for better performance with large video files
     return FileResponse(
         path=str(file_path),
         media_type=media_type,
         filename=filename,
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Accept-Ranges": "bytes"  # Enable range requests for better streaming
+        }
     )
 
 @app.get("/api/download/captions/{processing_id}/{filename}")
@@ -458,7 +469,8 @@ async def download_captions(processing_id: str, filename: str, db: Session = Dep
     if not clip:
         raise HTTPException(status_code=404, detail="Caption file not found")
     
-    file_path = config.RESULTS_DIR / processing_id / filename
+    # FIXED: Look in clips_processing directory where files are actually saved
+    file_path = config.RESULTS_DIR / "clips_processing" / filename
     storage = StorageHandler()
     
     if config.STORAGE_TYPE == 's3':
