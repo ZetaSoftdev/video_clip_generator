@@ -185,6 +185,7 @@ class ProgressCallback:
 def process_video_task(self, job_id: int):
     """Process video task with improved error handling and memory management"""
     temp_input_file = None
+    processed_clips = []  # Initialize early to avoid UnboundLocalError
     
     with get_db_session() as db:
         try:
