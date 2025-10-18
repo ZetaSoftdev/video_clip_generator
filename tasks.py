@@ -258,7 +258,8 @@ def process_video_task(self, job_id: int):
                 result = asyncio.run(video_service.process_video(
                     video_path=str(input_file),
                     num_clips=job.num_clips_requested,
-                    burn_captions=False
+                    burn_captions=False,
+                    progress_callback=progress_callback  # Pass progress callback
                 ))
             except MemoryError as mem_err:
                 raise Exception("Out of memory during video processing. Please try with a shorter video or contact support for assistance with large files.") from mem_err
@@ -326,9 +327,7 @@ def process_video_task(self, job_id: int):
                         "file_size": file_size
                     })
                     
-                    # Update progress
-                    progress = int(50 + (clip_number / len(processed_clips_data)) * 50)
-                    update_job_progress(db, job_id, progress, f"Completed clip {clip_number}/{len(processed_clips_data)}")
+                    # Progress is now handled by VideoService via callback
                     
                 except Exception as clip_error:
                     logger.error(f"Error processing clip {clip_data.get('clip_number', 'unknown')}: {clip_error}")

@@ -38,7 +38,7 @@ class VideoService:
         
         logger.info(f"VideoService initialized - Transcription available: {self.transcription_available}")
     
-    async def process_video(self, video_path, num_clips=3, burn_captions=False):
+    async def process_video(self, video_path, num_clips=3, burn_captions=False, progress_callback=None):
         """
         Process a video to create short vertical clips
         
@@ -46,6 +46,7 @@ class VideoService:
             video_path: Path to the video file
             num_clips: Number of clips to generate
             burn_captions: Whether to burn captions into the video
+            progress_callback: Optional callback for progress updates
             
         Returns:
             Dictionary containing the processed clips information
@@ -54,17 +55,25 @@ class VideoService:
         processed_clips = []
         job_id = str(uuid.uuid4())
         
+        # Helper function to update progress
+        def update_progress(percent, message):
+            if progress_callback:
+                progress_callback.on_progress_update(percent, message)
+        
         try:
             # Generate a unique ID for this processing job
             logger.info(f"Starting video processing job {job_id} for {video_path}")
+            update_progress(5, "Initializing video processing...")
             
             # Step 1: Extract audio from video
             logger.info("Step 1: Extracting audio from video")
+            update_progress(10, "Extracting audio from video...")
             start_time = time.time()
             audio_path = await self.edit_service.extract_audio(video_path)
             if not audio_path:
                 raise Exception("Failed to extract audio from video")
             logger.info(f"Audio extraction completed in {time.time() - start_time:.2f} seconds")
+            update_progress(20, "Audio extraction complete")
             
             # Try transcription-based processing first if available
             transcriptions = None
@@ -73,16 +82,20 @@ class VideoService:
             if self.transcription_available:
                 # Step 2: Try to transcribe audio
                 logger.info("Step 2: Attempting audio transcription")
+                update_progress(25, "Transcribing audio...")
                 start_time = time.time()
                 try:
                     transcriptions, word_level_data = await self.transcription_service.transcribe_audio(audio_path)
                     if transcriptions and len(transcriptions) > 0:
                         logger.info(f"Transcription completed in {time.time() - start_time:.2f} seconds")
+                        update_progress(40, "Transcription complete")
                     else:
                         logger.warning("Transcription returned no results, falling back to simple segmentation")
+                        update_progress(35, "Transcription unavailable, using simple segmentation")
                         transcriptions = None
                 except Exception as e:
                     logger.warning(f"Transcription failed: {e}, falling back to simple segmentation")
+                    update_progress(35, "Transcription failed, using simple segmentation")
                     transcriptions = None
             
             # If we have transcriptions, use AI-powered highlight detection
@@ -92,15 +105,21 @@ class VideoService:
                 
                 # Step 3: Get highlights
                 logger.info(f"Step 3: Finding {num_clips} highlights using AI")
+                update_progress(45, f"Finding {num_clips} best highlights...")
                 start_time = time.time()
                 highlights = await self.highlights_service.get_highlights(transcript_text, num_clips)
                 if highlights:
                     logger.info(f"Highlight detection completed in {time.time() - start_time:.2f} seconds")
+                    update_progress(50, f"Found {len(highlights)} highlights")
                     
                     # Step 4: Process each highlight
                     logger.info(f"Step 4: Processing {len(highlights)} highlights")
                     
                     for i, highlight in enumerate(highlights, 1):
+                        # Calculate progress: 50% base + (clip progress * 50%)
+                        clip_progress = 50 + int((i / len(highlights)) * 50)
+                        update_progress(clip_progress, f"Processing clip {i}/{len(highlights)}...")
+                        
                         start_time_proc = time.time()
                         start_time_clip = highlight["start_time"]
                         end_time_clip = highlight["end_time"]
@@ -131,15 +150,22 @@ class VideoService:
             # If no transcriptions available, split video into equal parts
             if not transcriptions:
                 logger.warning("Using simple video segmentation")
+                update_progress(45, "Using simple video segmentation...")
                 
                 # Get video duration
                 video_duration = await self.edit_service.get_video_duration(video_path)
                 if not video_duration:
                     raise Exception("Failed to get video duration")
                 
+                update_progress(50, f"Creating {num_clips} equal segments...")
+                
                 # Create clips by dividing the video into equal parts
                 segment_duration = video_duration / num_clips
                 for i in range(num_clips):
+                    # Calculate progress: 50% base + (clip progress * 50%)
+                    clip_progress = 50 + int(((i + 1) / num_clips) * 50)
+                    update_progress(clip_progress, f"Processing segment {i+1}/{num_clips}...")
+                    
                     start_time_proc = time.time()
                     start_time_clip = i * segment_duration
                     end_time_clip = min((i + 1) * segment_duration, video_duration)
