@@ -14,12 +14,16 @@ import boto3
 from botocore.exceptions import ClientError
 import tempfile
 import os
+import logging
 
 import config
 from database import get_db, init_database
 from models import ProcessingJob, GeneratedClip, FacelessVideoJob, FacelessVideoScene
 from tasks import process_video_task, generate_faceless_video_task, celery_app
 from storage_handler import StorageHandler
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(
