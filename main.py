@@ -2,7 +2,7 @@
 FastAPI application for Video Clip Generator
 """
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, BackgroundTasks
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from pathlib import Path
@@ -182,6 +182,12 @@ def parse_aspect_ratio(ratio: str) -> tuple:
         return (int(parts[0]), int(parts[1]))
     except:
         raise HTTPException(status_code=400, detail=f"Invalid aspect ratio format: {ratio}")
+
+async def file_iterator(file_path: str, chunk_size: int = 1024 * 1024):  # 1MB chunks
+    """Async generator for streaming large files efficiently"""
+    async with aiofiles.open(file_path, mode='rb') as file:
+        while chunk := await file.read(chunk_size):
+            yield chunk
 
 # API Routes
 
@@ -428,17 +434,21 @@ async def download_clip(processing_id: str, filename: str, db: Session = Depends
         if not file_path.exists():
             raise HTTPException(status_code=404, detail="File not found on disk")
     
-    # Determine media type
-    media_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
+    # Get file size for Content-Length header
+    file_size = file_path.stat().st_size
     
-    # Use streaming response for better performance with large video files
-    return FileResponse(
-        path=str(file_path),
+    # Determine media type
+    media_type = mimetypes.guess_type(str(file_path))[0] or "video/mp4"
+    
+    # Use StreamingResponse for efficient large file delivery
+    return StreamingResponse(
+        file_iterator(str(file_path), chunk_size=2 * 1024 * 1024),  # 2MB chunks for better performance
         media_type=media_type,
-        filename=filename,
         headers={
             "Content-Disposition": f"attachment; filename={filename}",
-            "Accept-Ranges": "bytes"  # Enable range requests for better streaming
+            "Content-Length": str(file_size),
+            "Accept-Ranges": "bytes",
+            "Cache-Control": "no-cache"
         }
     )
 
