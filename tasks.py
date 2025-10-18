@@ -298,6 +298,13 @@ def process_video_task(self, job_id: int):
                     file_size = clip_path.stat().st_size if clip_path.exists() else 0
                     
                     # Save clip info to database
+                    logger.info(f"💾 Preparing to save clip {clip_number} to database:")
+                    logger.info(f"   - clip_filename: {clip_path.name}")
+                    logger.info(f"   - caption_filename: {caption_path.name if caption_path else 'None'}")
+                    logger.info(f"   - duration: {clip_data['duration']}")
+                    logger.info(f"   - file_size: {file_size}")
+                    logger.info(f"   - clip_text_preview: {clip_text_preview[:50]}...")
+                    
                     db_clip = GeneratedClip(
                         job_id=job_id,
                         clip_number=clip_number,
@@ -310,6 +317,7 @@ def process_video_task(self, job_id: int):
                         end_time=clip_data['end_time']
                     )
                     db.add(db_clip)
+                    logger.info(f"✅ Clip {clip_number} added to database session")
                     
                     processed_clips.append({
                         "clip_number": clip_number,
@@ -339,7 +347,22 @@ def process_video_task(self, job_id: int):
             update_job_status(db, job_id, "completed")
             update_job_progress(db, job_id, 100, f"Completed! Generated {len(processed_clips)} clips")
             
-            db.commit()
+            logger.info(f"💾 Committing {len(processed_clips)} clips to database...")
+            try:
+                db.commit()
+                logger.info(f"✅ Database commit successful!")
+                
+                # Verify clips were saved
+                saved_clips = db.query(GeneratedClip).filter(GeneratedClip.job_id == job_id).all()
+                logger.info(f"🔍 Verification: Found {len(saved_clips)} clips in database for job {job_id}")
+                for saved_clip in saved_clips:
+                    logger.info(f"   - Clip {saved_clip.clip_number}: {saved_clip.clip_filename}")
+            except Exception as commit_error:
+                logger.error(f"❌ Database commit failed: {commit_error}")
+                logger.error(f"   Error details: {traceback.format_exc()}")
+                db.rollback()
+                raise
+            
             print(f"✅ Successfully processed video for job {job.processing_id}")
             
             # Final memory cleanup
