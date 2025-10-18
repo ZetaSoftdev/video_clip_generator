@@ -50,9 +50,12 @@ class VideoService:
         Returns:
             Dictionary containing the processed clips information
         """
+        # Initialize early to avoid UnboundLocalError in exception handler
+        processed_clips = []
+        job_id = str(uuid.uuid4())
+        
         try:
             # Generate a unique ID for this processing job
-            job_id = str(uuid.uuid4())
             logger.info(f"Starting video processing job {job_id} for {video_path}")
             
             # Step 1: Extract audio from video
@@ -62,8 +65,6 @@ class VideoService:
             if not audio_path:
                 raise Exception("Failed to extract audio from video")
             logger.info(f"Audio extraction completed in {time.time() - start_time:.2f} seconds")
-            
-            processed_clips = []
             
             # Try transcription-based processing first if available
             transcriptions = None
