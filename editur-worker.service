@@ -1,0 +1,15 @@
+[Unit]
+Description=Editur AI Celery Worker
+After=network.target redis.service postgresql.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/editur-ai/backend
+Environment="PATH=/opt/editur-ai/backend/venv/bin:/usr/bin:/bin"
+ExecStart=/opt/editur-ai/backend/venv/bin/celery -A tasks.celery_app worker --loglevel=info --concurrency=2
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
