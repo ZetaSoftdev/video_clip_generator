@@ -68,7 +68,7 @@ class GeneratedClip(Base):
     # Clip information
     clip_number = Column(Integer, nullable=False)
     clip_filename = Column(String, nullable=False)
-    caption_filename = Column(String, nullable=False)
+    caption_filename = Column(String, nullable=True)  # Optional - may not exist if transcription fails
     
     # Clip metadata
     duration_seconds = Column(Float, nullable=False)
@@ -84,7 +84,7 @@ class GeneratedClip(Base):
     
     def to_dict(self):
         """Convert model to dictionary for API responses"""
-        return {
+        response = {
             "clip_id": self.clip_number,
             "filename": self.clip_filename,
             "duration": self.duration_seconds,
@@ -92,9 +92,14 @@ class GeneratedClip(Base):
             "file_size": f"{self.file_size_bytes / (1024*1024):.1f}MB",
             "start_time": self.start_time,
             "end_time": self.end_time,
-            "download_url": f"/api/download/clips/{self.job.processing_id}/{self.clip_filename}",
-            "captions_url": f"/api/download/captions/{self.job.processing_id}/{self.caption_filename}"
+            "download_url": f"/api/download/clips/{self.job.processing_id}/{self.clip_filename}"
         }
+        
+        # Only include captions URL if caption file exists
+        if self.caption_filename:
+            response["captions_url"] = f"/api/download/captions/{self.job.processing_id}/{self.caption_filename}"
+        
+        return response
 
 class FacelessVideoJob(Base):
     """Model for tracking faceless video generation jobs"""
