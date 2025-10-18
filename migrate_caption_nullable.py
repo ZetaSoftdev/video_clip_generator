@@ -4,11 +4,11 @@ Migration script to make caption_filename nullable in generated_clips table
 """
 import os
 from sqlalchemy import create_engine, text
-from database import get_database_url
+import config
 
 def migrate():
     """Run the migration to make caption_filename nullable"""
-    database_url = get_database_url()
+    database_url = config.DATABASE_URL
     engine = create_engine(database_url)
     
     print("Starting migration: Make caption_filename nullable in generated_clips table")
