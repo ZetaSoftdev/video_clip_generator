@@ -255,12 +255,22 @@ class VideoService:
             
             # Create subtitle files if transcriptions are available
             subtitle_filename = None
+            caption_filename = None
             if transcriptions:
                 subtitle_filename = f"{title}.srt"
                 subtitle_path = output_dir / subtitle_filename
                 
                 await self.subtitles_service.create_subtitle(
                     transcriptions, start_time, end_time, str(subtitle_path)
+                )
+            
+            # Create word-level JSON caption file if word_level_data is available
+            if word_level_data:
+                caption_filename = f"{title}.json"
+                caption_path = output_dir / caption_filename
+                
+                await self.subtitles_service.create_word_level_timestamps(
+                    word_level_data, start_time, end_time, str(caption_path)
                 )
             
             # Get clip file size and calculate duration
@@ -281,7 +291,7 @@ class VideoService:
                 "clip_number": clip_number,
                 "clip_filename": clip_filename,
                 "clip_path": str(clip_path),
-                "caption_path": str(subtitle_path) if subtitle_filename else None,
+                "caption_path": str(caption_path) if caption_filename else (str(subtitle_path) if subtitle_filename else None),
                 "duration": duration,
                 "start_time": start_time,
                 "end_time": end_time,

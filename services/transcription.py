@@ -65,7 +65,7 @@ class TranscriptionService:
 
     async def transcribe_audio(self, audio_path):
         """
-        Transcribe audio using WhisperX or Faster Whisper
+        Transcribe audio using WhisperX, Faster Whisper, or OpenAI Whisper API
         
         Args:
             audio_path: Path to the audio file
@@ -84,15 +84,21 @@ class TranscriptionService:
             if self.whisperx_available:
                 return await self._transcribe_with_whisperx(abs_audio_path)
             
+            # Try OpenAI Whisper API (provides word-level timestamps)
+            elif hasattr(self, '_transcribe_with_openai_api'):
+                try:
+                    return await self._transcribe_with_openai_api(abs_audio_path)
+                except Exception as api_error:
+                    logger.warning(f"OpenAI API transcription failed: {api_error}")
+            
             # Fall back to Faster Whisper
-            elif self.faster_whisper_available:
+            if self.faster_whisper_available:
                 transcriptions = await self._transcribe_with_faster_whisper(abs_audio_path)
                 return transcriptions, None  # No word-level timestamps with Faster Whisper
             
             # No transcription service available
-            else:
-                logger.error("No transcription service available")
-                return [], None
+            logger.error("No transcription service available")
+            return [], None
                 
         except Exception as e:
             logger.error(f"Transcription Error: {str(e)}", exc_info=True)
@@ -230,3 +236,70 @@ class TranscriptionService:
         except Exception as e:
             logger.error(f"Faster Whisper processing error: {str(e)}", exc_info=True)
             return []
+    
+    async def _transcribe_with_openai_api(self, audio_path):
+        """Transcribe using OpenAI Whisper API with word-level timestamps"""
+        try:
+            from openai import OpenAI
+            import config
+            
+            if not config.OPENAI_API_KEY:
+                logger.error("OpenAI API key not configured")
+                return [], None
+            
+            client = OpenAI(api_key=config.OPENAI_API_KEY)
+            
+            logger.info("Transcribing with OpenAI Whisper API (word-level timestamps)...")
+            
+            with open(audio_path, 'rb') as audio_file:
+                response = client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=audio_file,
+                    response_format="verbose_json",
+                    timestamp_granularities=["word", "segment"]
+                )
+            
+            # Process response
+            transcriptions = []
+            word_level_data = {
+                "text": response.text,
+                "segments": []
+            }
+            
+            # Process segments
+            for idx, segment in enumerate(response.segments):
+                text = segment['text'].strip()
+                start = segment['start']
+                end = segment['end']
+                transcriptions.append([text, start, end])
+                
+                segment_data = {
+                    "id": idx,
+                    "start": start,
+                    "end": end,
+                    "text": text,
+                    "words": []
+                }
+                
+                # Extract words for this segment from the words array
+                if hasattr(response, 'words'):
+                    for word_data in response.words:
+                        word_start = word_data['start']
+                        word_end = word_data['end']
+                        
+                        # Check if word belongs to this segment
+                        if start <= word_start <= end:
+                            segment_data["words"].append({
+                                "word": word_data['word'],
+                                "start": word_start,
+                                "end": word_end
+                            })
+                
+                word_level_data["segments"].append(segment_data)
+            
+            logger.info(f"OpenAI API transcription complete! {len(transcriptions)} segments with word-level timestamps.")
+            return transcriptions, word_level_data
+            
+        except Exception as e:
+            logger.error(f"OpenAI API transcription error: {str(e)}", exc_info=True)
+            return [], None

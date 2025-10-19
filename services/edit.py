@@ -49,7 +49,7 @@ class EditService:
         try:
             # Use ffmpeg directly for reliable audio extraction
             cmd = [
-                "/usr/bin/ffmpeg", "-i", str(video_path),
+                "ffmpeg", "-i", str(video_path),
                 "-q:a", "0", "-map", "a",
                 "-y", str(audio_path)
             ]
@@ -103,7 +103,7 @@ class EditService:
             
             # Use ffmpeg for cropping and aspect ratio conversion to 9:16
             cmd = [
-                "/usr/bin/ffmpeg", "-i", input_file,
+                "ffmpeg", "-i", input_file,
                 "-ss", str(safe_start_time),
                 "-t", str(duration),
                 "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
@@ -148,7 +148,7 @@ class EditService:
         """
         try:
             cmd = [
-                "/usr/bin/ffprobe", "-v", "quiet", "-show_entries", "format=duration",
+                "ffprobe", "-v", "quiet", "-show_entries", "format=duration",
                 "-of", "csv=p=0", video_path
             ]
             
@@ -194,7 +194,7 @@ class EditService:
                     width, height = int(1080 * ratio), 1080
             
             cmd = [
-                "/usr/bin/ffmpeg", "-i", input_file,
+                "ffmpeg", "-i", input_file,
                 "-vf", f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height}",
                 "-c:v", "libx264",
                 "-preset", "fast", 
