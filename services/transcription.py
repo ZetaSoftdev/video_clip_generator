@@ -259,15 +259,19 @@ class TranscriptionService:
                     timestamp_granularities=["word", "segment"]
                 )
             
-            # Process response
+            # Process response (response is dict, not object)
             transcriptions = []
             word_level_data = {
                 "text": response.text,
                 "segments": []
             }
             
+            # Get segments and words from response dict
+            segments = response.get('segments', [])
+            words = response.get('words', [])
+            
             # Process segments
-            for idx, segment in enumerate(response.segments):
+            for idx, segment in enumerate(segments):
                 text = segment['text'].strip()
                 start = segment['start']
                 end = segment['end']
@@ -282,22 +286,21 @@ class TranscriptionService:
                 }
                 
                 # Extract words for this segment from the words array
-                if hasattr(response, 'words'):
-                    for word_data in response.words:
-                        word_start = word_data['start']
-                        word_end = word_data['end']
-                        
-                        # Check if word belongs to this segment
-                        if start <= word_start <= end:
-                            segment_data["words"].append({
-                                "word": word_data['word'],
-                                "start": word_start,
-                                "end": word_end
-                            })
+                for word_data in words:
+                    word_start = word_data['start']
+                    word_end = word_data['end']
+                    
+                    # Check if word belongs to this segment
+                    if start <= word_start <= end:
+                        segment_data["words"].append({
+                            "word": word_data['word'],
+                            "start": word_start,
+                            "end": word_end
+                        })
                 
                 word_level_data["segments"].append(segment_data)
             
-            logger.info(f"OpenAI API transcription complete! {len(transcriptions)} segments with word-level timestamps.")
+            logger.info(f"OpenAI API transcription complete! {len(transcriptions)} segments with {len(words)} word-level timestamps.")
             return transcriptions, word_level_data
             
         except Exception as e:
