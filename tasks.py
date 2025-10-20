@@ -155,6 +155,10 @@ class ProgressCallback:
         self.base_progress = 50  # First 50% is transcription and finding clips
         self.current_clip = 0
     
+    def on_progress_update(self, percent: int, message: str):
+        """Generic progress update handler called by VideoService"""
+        update_job_progress(self.db, self.job_id, percent, message)
+    
     def on_transcription_update(self, step: str):
         """Update transcription progress"""
         progress = 10 if "starting" in step.lower() else 30
