@@ -155,27 +155,27 @@ class ProgressCallback:
         self.base_progress = 50  # First 50% is transcription and finding clips
         self.current_clip = 0
     
-    def update_transcription(self, step: str):
+    def on_transcription_update(self, step: str):
         """Update transcription progress"""
         progress = 10 if "starting" in step.lower() else 30
         update_job_progress(self.db, self.job_id, progress, step)
     
-    def update_clip_finding(self, clips_found: int):
+    def on_clip_finding_update(self, clips_found: int):
         """Update clip finding progress"""
         update_job_progress(self.db, self.job_id, 40, f"Found {clips_found} potential clips")
     
-    def update_clip_selection(self, clips_selected: int):
+    def on_clip_selection_update(self, clips_selected: int):
         """Update clip selection progress"""
         update_job_progress(self.db, self.job_id, 50, f"Selected {clips_selected} clips for processing")
     
-    def update_clip_processing(self, clip_number: int, step: str):
+    def on_clip_processing_update(self, clip_number: int, step: str):
         """Update individual clip processing progress"""
         # Clips processing takes 50% of total progress (50-100%)
         clip_progress = (clip_number - 1) / self.total_clips * 50
         progress = int(50 + clip_progress)
         update_job_progress(self.db, self.job_id, progress, f"Clip {clip_number}/{self.total_clips}: {step}")
     
-    def update_clip_completed(self, clip_number: int):
+    def on_clip_completed_update(self, clip_number: int):
         """Update when a clip is completed"""
         clip_progress = clip_number / self.total_clips * 50
         progress = int(50 + clip_progress)
