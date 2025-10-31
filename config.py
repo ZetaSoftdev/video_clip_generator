@@ -87,6 +87,9 @@ DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 AUTO_RELOAD = os.getenv("AUTO_RELOAD", "True").lower() == "true"
 SHOW_ERROR_DETAILS = os.getenv("SHOW_ERROR_DETAILS", "False").lower() == "true"
 
+# Optional RNNoise model path for arnndn
+RNNOISE_MODEL_PATH = os.getenv("RNNOISE_MODEL_PATH")
+
 # ============================================================================
 # CLIP SELECTION AI CONFIGURATION (OpenRouter)
 # ============================================================================

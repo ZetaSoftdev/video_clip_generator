@@ -37,6 +37,9 @@ services:
       - API_HOST=0.0.0.0
       - API_PORT=8000
       - DEBUG=true
+
+      # RNNoise model path
+      - RNNOISE_MODEL_PATH=/app/models/rnnoise-general.rnnn
       
       # Processing settings
       - DEFAULT_NUM_CLIPS=3
@@ -65,6 +68,9 @@ services:
       - DATABASE_URL=sqlite:///./storage/app.db
       - REDIS_URL=redis://redis:6379/0
       - STORAGE_TYPE=local
+
+      # RNNoise model path
+      - RNNOISE_MODEL_PATH=/app/models/rnnoise-general.rnnn
       
       # S3 settings (for when you want to test S3)
       # - AWS_ACCESS_KEY_ID=your_access_key

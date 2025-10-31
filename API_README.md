@@ -118,7 +118,9 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 curl -X POST "http://localhost:8000/api/upload-video" \
   -F "file=@your_video.mp4" \
   -F "num_clips=3" \
-  -F "ratio=9:16"
+  -F "ratio=9:16" \
+  -F "noise_reduction=true" \
+  -F "nr_method=afftdn"   # optional: afftdn (default) or arnndn
 ```
 
 **Response:**

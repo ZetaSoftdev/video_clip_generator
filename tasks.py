@@ -186,7 +186,7 @@ class ProgressCallback:
         update_job_progress(self.db, self.job_id, progress, f"Completed clip {clip_number}/{self.total_clips}")
 
 @celery_app.task(bind=True, max_retries=1, soft_time_limit=1800, time_limit=2100)
-def process_video_task(self, job_id: int):
+def process_video_task(self, job_id: int, noise_reduction: bool = False, nr_method: str = None):
     """Process video task with improved error handling and memory management"""
     temp_input_file = None
     processed_clips = []  # Initialize early to avoid UnboundLocalError
@@ -263,7 +263,10 @@ def process_video_task(self, job_id: int):
                     video_path=str(input_file),
                     num_clips=job.num_clips_requested,
                     burn_captions=False,
-                    progress_callback=progress_callback  # Pass progress callback
+                    progress_callback=progress_callback,  # Pass progress callback
+                    noise_reduction=noise_reduction,
+                    nr_method=nr_method,
+                    processing_id=job.processing_id
                 ))
             except MemoryError as mem_err:
                 raise Exception("Out of memory during video processing. Please try with a shorter video or contact support for assistance with large files.") from mem_err

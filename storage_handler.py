@@ -37,15 +37,13 @@ class StorageHandler:
             self.bucket_name = None
     
     def _get_s3_key(self, file_path: Union[str, Path]) -> str:
-        """Convert local path to S3 key"""
-        path = Path(file_path)
-        if 'uploads' in str(path):
-            return f"uploads/{path.name}"
-        elif 'processing' in str(path):
-            return f"processing/{path.name}"
-        elif 'results' in str(path):
-            return f"results/{path.name}"
-        return str(path.name)
+        """Convert local path to S3 key preserving subdirectories under known roots"""
+        s = str(file_path).replace('\\', '/')
+        for root in ['uploads/', 'processing/', 'results/']:
+            idx = s.find(root)
+            if idx != -1:
+                return s[idx:]
+        return Path(file_path).name
     
     def save_file(self, source_path: Union[str, Path], dest_path: Union[str, Path]) -> bool:
         """

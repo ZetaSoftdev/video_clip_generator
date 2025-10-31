@@ -36,6 +36,7 @@ clip_generator_env/
 bin/
 include/
 pyvenv.cfg
+notes
 
 # Storage and temporary files
 storage/

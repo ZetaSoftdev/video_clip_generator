@@ -38,7 +38,7 @@ class VideoService:
         
         logger.info(f"VideoService initialized - Transcription available: {self.transcription_available}")
     
-    async def process_video(self, video_path, num_clips=3, burn_captions=False, progress_callback=None):
+    async def process_video(self, video_path, num_clips=3, burn_captions=False, progress_callback=None, noise_reduction: bool = False, nr_method: str = None, processing_id: str = None):
         """
         Process a video to create short vertical clips
         
@@ -54,6 +54,9 @@ class VideoService:
         # Initialize early to avoid UnboundLocalError in exception handler
         processed_clips = []
         job_id = str(uuid.uuid4())
+        # Ensure we always have a non-empty processing_id to avoid collisions
+        if not processing_id or not str(processing_id).strip():
+            processing_id = job_id
         
         # Helper function to update progress
         def update_progress(percent, message):
@@ -136,7 +139,10 @@ class VideoService:
                             transcriptions=transcriptions,
                             reason=reason,
                             title=title,
-                            word_level_data=word_level_data
+                            word_level_data=word_level_data,
+                            noise_reduction=noise_reduction,
+                            nr_method=nr_method,
+                            processing_id=processing_id
                         )
                         
                         if clip_info:
@@ -180,7 +186,10 @@ class VideoService:
                         transcriptions=None,
                         reason="Auto-segmented clip",
                         title=f"Segment {i+1}",
-                        word_level_data=None
+                        word_level_data=None,
+                        noise_reduction=noise_reduction,
+                        nr_method=nr_method,
+                        processing_id=processing_id
                     )
                     
                     if clip_info:
@@ -217,7 +226,7 @@ class VideoService:
             raise
     
     async def _process_clip(self, video_path, start_time, end_time, clip_number, 
-                          transcriptions=None, reason="", title=None, word_level_data=None):
+                          transcriptions=None, reason="", title=None, word_level_data=None, noise_reduction: bool = False, nr_method: str = None, processing_id: str = None):
         """Process a single clip from the video"""
         try:
             # Use provided title or generate one
@@ -233,12 +242,13 @@ class VideoService:
             # Import config here to avoid circular imports
             import config
             
-            # Setup output directory
-            output_dir = config.RESULTS_DIR / "clips_processing"
+            # Setup output directory under processing_id to avoid collisions
+            output_dir = config.RESULTS_DIR / (processing_id or "clips_processing")
             output_dir.mkdir(parents=True, exist_ok=True)
             
-            # Generate output paths
-            clip_filename = f"{title}.mp4"
+            # Generate output paths (prefix with processing_id to avoid collisions)
+            prefix = f"{processing_id}_" if processing_id else ""
+            clip_filename = f"{prefix}{title}.mp4"
             clip_path = output_dir / clip_filename
             
             # Generate clips using edit service
@@ -246,7 +256,9 @@ class VideoService:
                 input_file=str(video_path),
                 output_file=str(clip_path),
                 start_time=start_time,
-                end_time=end_time
+                end_time=end_time,
+                apply_noise_reduction=noise_reduction,
+                nr_method=nr_method
             )
             
             if not success:
@@ -256,22 +268,46 @@ class VideoService:
             # Create subtitle files if transcriptions are available
             subtitle_filename = None
             caption_filename = None
-            if transcriptions:
-                subtitle_filename = f"{title}.srt"
-                subtitle_path = output_dir / subtitle_filename
-                
-                await self.subtitles_service.create_subtitle(
-                    transcriptions, start_time, end_time, str(subtitle_path)
-                )
-            
-            # Create word-level JSON caption file if word_level_data is available
-            if word_level_data:
-                caption_filename = f"{title}.json"
-                caption_path = output_dir / caption_filename
-                
-                await self.subtitles_service.create_word_level_timestamps(
-                    word_level_data, start_time, end_time, str(caption_path)
-                )
+            if noise_reduction:
+                clip_audio_path = None
+                try:
+                    clip_audio_path = await self.edit_service.extract_audio(str(clip_path))
+                    if clip_audio_path:
+                        transcriptions2, word_level2 = await self.transcription_service.transcribe_audio(clip_audio_path)
+                        if transcriptions2:
+                            subtitle_filename = f"{prefix}{title}.srt"
+                            subtitle_path = output_dir / subtitle_filename
+                            await self.subtitles_service.create_subtitle(
+                                transcriptions2, start_time, end_time, str(subtitle_path)
+                            )
+                        if word_level2:
+                            caption_filename = f"{prefix}{title}.json"
+                            caption_path = output_dir / caption_filename
+                            await self.subtitles_service.create_word_level_timestamps(
+                                word_level2, start_time, end_time, str(caption_path)
+                            )
+                except Exception:
+                    logger.warning("Subtitle generation from cleaned clip failed; proceeding without.")
+                finally:
+                    # Cleanup temporary clip audio unconditionally
+                    try:
+                        if clip_audio_path and os.path.exists(clip_audio_path):
+                            os.remove(clip_audio_path)
+                    except Exception as e:
+                        logger.warning(f"Failed to cleanup temporary clip audio {clip_audio_path}: {e}")
+            else:
+                if transcriptions:
+                    subtitle_filename = f"{prefix}{title}.srt"
+                    subtitle_path = output_dir / subtitle_filename
+                    await self.subtitles_service.create_subtitle(
+                        transcriptions, start_time, end_time, str(subtitle_path)
+                    )
+                if word_level_data:
+                    caption_filename = f"{prefix}{title}.json"
+                    caption_path = output_dir / caption_filename
+                    await self.subtitles_service.create_word_level_timestamps(
+                        word_level_data, start_time, end_time, str(caption_path)
+                    )
             
             # Get clip file size and calculate duration
             clip_size = clip_path.stat().st_size if clip_path.exists() else 0

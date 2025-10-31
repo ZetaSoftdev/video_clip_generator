@@ -246,7 +246,9 @@ async def upload_video(
     file: UploadFile = File(...),
     num_clips: int = config.DEFAULT_NUM_CLIPS,
     ratio: str = config.DEFAULT_RATIO,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    noise_reduction: bool = False,
+    nr_method: Optional[str] = None
 ):
     """
     Upload video and start processing
@@ -325,7 +327,7 @@ async def upload_video(
         db.refresh(job)
         
         # Queue processing task
-        task = process_video_task.delay(job.id)
+        task = process_video_task.delay(job.id, noise_reduction=noise_reduction, nr_method=nr_method)
         
         print(f"📤 Video uploaded and queued: {file.filename} -> {processing_id}")
         if storage_type == 's3':
@@ -423,8 +425,8 @@ async def download_clip(processing_id: str, filename: str, db: Session = Depends
     if not clip:
         raise HTTPException(status_code=404, detail="Clip not found")
     
-    # FIXED: Look in clips_processing directory where files are actually saved
-    file_path = config.RESULTS_DIR / "clips_processing" / filename
+    # Look in per-job results directory
+    file_path = config.RESULTS_DIR / processing_id / filename
     storage = StorageHandler()
     
     if config.STORAGE_TYPE == 's3':
@@ -483,8 +485,8 @@ async def download_captions(processing_id: str, filename: str, db: Session = Dep
     if not clip:
         raise HTTPException(status_code=404, detail="Caption file not found")
     
-    # FIXED: Look in clips_processing directory where files are actually saved
-    file_path = config.RESULTS_DIR / "clips_processing" / filename
+    # Look in per-job results directory
+    file_path = config.RESULTS_DIR / processing_id / filename
     storage = StorageHandler()
     
     if config.STORAGE_TYPE == 's3':

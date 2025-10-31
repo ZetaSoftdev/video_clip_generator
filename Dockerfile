@@ -23,6 +23,9 @@ RUN apt-get update && apt-get install -y \
 # Copy requirements first for better Docker layer caching
 COPY requirements.txt .
 
+# Copy RNNoise model
+COPY models/rnnoise-general.rnnn /app/models/rnnoise-general.rnnn
+
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 

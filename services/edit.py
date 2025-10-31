@@ -69,7 +69,7 @@ class EditService:
             logger.error(f"Error extracting audio: {str(e)}", exc_info=True)
             return None
 
-    async def crop_video(self, input_file, output_file, start_time, end_time):
+    async def crop_video(self, input_file, output_file, start_time, end_time, apply_noise_reduction: bool = False, nr_method: str = None):
         """
         Crop video to a specific time range and convert to 9:16 aspect ratio
         
@@ -112,8 +112,18 @@ class EditService:
                 "-crf", str(config.VIDEO_CRF),
                 "-c:a", "aac",
                 "-b:a", config.AUDIO_BITRATE,
-                "-y", output_file
             ]
+
+            # Optional noise reduction
+            if apply_noise_reduction:
+                method = (nr_method or "afftdn").lower()
+                if method == "arnndn" and getattr(config, "RNNOISE_MODEL_PATH", None):
+                    cmd += ["-af", f"arnndn=m={config.RNNOISE_MODEL_PATH}"]
+                else:
+                    # default to afftdn mild/medium strength
+                    cmd += ["-af", "afftdn=nf=-20"]
+
+            cmd += ["-y", output_file]
                 
             logger.info(f"Running ffmpeg command: {' '.join(cmd)}")
             
