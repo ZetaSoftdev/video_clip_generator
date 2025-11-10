@@ -291,6 +291,11 @@ class VideoClipsService:
             duration = end_time - start_time
             
             # Return clip information in the expected format for backend
+            # Use title for preview if available, otherwise use reason
+            preview_text = title if title else (reason[:100] if reason else f"Clip {clip_number}")
+            if len(preview_text) > 100:
+                preview_text = preview_text[:100] + '...'
+            
             clip_info = {
                 "clip_number": clip_number,
                 "clip_filename": clip_filename,
@@ -298,7 +303,7 @@ class VideoClipsService:
                 "word_timestamps_filename": word_timestamps_filename,
                 "duration_seconds": duration,
                 "file_size_bytes": clip_size,
-                "clip_text_preview": reason[:100] if reason else f"Clip {clip_number}",
+                "clip_text_preview": preview_text,
                 "start_time": start_time,
                 "end_time": end_time,
                 "title": title,

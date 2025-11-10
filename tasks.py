@@ -286,8 +286,45 @@ def process_video_task(self, job_id: int, noise_reduction: bool = False, nr_meth
                     clip_path = Path(clip_data['clip_path'])
                     caption_path = Path(clip_data.get('caption_path', '')) if clip_data.get('caption_path') else None
                     
-                    # Get clip text preview
-                    clip_text_preview = clip_data.get('full_text', '')[:100] + ('...' if len(clip_data.get('full_text', '')) > 100 else '')
+                    # Get clip text preview - prioritize title from highlights (meaningful, contextual)
+                    # Title should be a short 2-5 word phrase from AI highlights, not raw transcription
+                    title = clip_data.get('title')
+                    reason = clip_data.get('reason')
+                    full_text = clip_data.get('full_text', '')
+                    
+                    # Log what we're getting for debugging
+                    logger.info(f"📝 Clip {clip_number} title data:")
+                    logger.info(f"   - title: {title}")
+                    logger.info(f"   - reason: {reason}")
+                    logger.info(f"   - full_text (first 50 chars): {full_text[:50] if full_text else 'None'}...")
+                    
+                    # Use title if available (this is the proper contextual title from highlights)
+                    if title and title.strip():
+                        clip_text_preview = title.strip()
+                        logger.info(f"✅ Using title for preview: {clip_text_preview}")
+                    elif reason and reason.strip():
+                        # Fallback to reason if title not available
+                        clip_text_preview = reason.strip()
+                        logger.info(f"⚠️ Using reason for preview (title not available): {clip_text_preview}")
+                    elif full_text:
+                        # Last resort: use first meaningful words from transcription
+                        # But try to extract a better title from the first sentence
+                        words = full_text.split()
+                        if len(words) > 0:
+                            # Take first 8-10 words as a more meaningful preview
+                            clip_text_preview = ' '.join(words[:10])
+                            if len(full_text) > len(clip_text_preview):
+                                clip_text_preview += '...'
+                            logger.info(f"⚠️ Using full_text excerpt for preview (no title/reason): {clip_text_preview[:50]}...")
+                        else:
+                            clip_text_preview = f"Clip {clip_number}"
+                    else:
+                        clip_text_preview = f"Clip {clip_number}"
+                        logger.info(f"⚠️ No title data available, using default: {clip_text_preview}")
+                    
+                    # Ensure preview is not too long (titles should be short anyway)
+                    if len(clip_text_preview) > 100:
+                        clip_text_preview = clip_text_preview[:100] + '...'
                     
                     # Upload to S3 if using S3 storage
                     if config.STORAGE_TYPE.split('#')[0].strip() == 's3':

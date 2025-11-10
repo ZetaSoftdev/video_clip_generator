@@ -130,6 +130,7 @@ class VideoService:
                         title = highlight.get("title", f"Clip {i}")
                         
                         logger.info(f"Processing highlight {i}/{len(highlights)}: {start_time_clip:.2f}s to {end_time_clip:.2f}s")
+                        logger.info(f"📌 Highlight title: '{title}' | reason: '{reason}'")
                         
                         clip_info = await self._process_clip(
                             video_path=video_path,
@@ -229,12 +230,19 @@ class VideoService:
                           transcriptions=None, reason="", title=None, word_level_data=None, noise_reduction: bool = False, nr_method: str = None, processing_id: str = None):
         """Process a single clip from the video"""
         try:
-            # Use provided title or generate one
+            # Store original title for display purposes (before sanitization)
+            # Title should be the meaningful contextual title from highlights (e.g., "Key Point", "Important Info")
+            # NOT the raw transcription text
+            original_title = title if title and title.strip() else (reason if reason and reason.strip() else f"Clip {clip_number}")
+            logger.info(f"🎯 Clip {clip_number} - Original title preserved: '{original_title}'")
+            
+            # Use provided title or generate one for filename
             if not title:
                 safe_reason = "".join(c for c in reason if c.isalnum() or c in (' ', '-', '_')).strip()
                 safe_reason = safe_reason.replace(' ', '_')[:30]
                 title = f"clip_{clip_number:02d}_{safe_reason}" if safe_reason else f"clip_{clip_number:02d}"
             else:
+                # Sanitize title for filename use
                 title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()
                 title = title.replace(' ', '_')
                 title = f"clip_{clip_number:02d}_{title}"
@@ -323,7 +331,7 @@ class VideoService:
                 full_text = " ".join(clip_words)
             
             # Return clip information
-            return {
+            result = {
                 "clip_number": clip_number,
                 "clip_filename": clip_filename,
                 "clip_path": str(clip_path),
@@ -332,8 +340,12 @@ class VideoService:
                 "start_time": start_time,
                 "end_time": end_time,
                 "full_text": full_text,
-                "file_size": clip_size
+                "file_size": clip_size,
+                "title": original_title,  # Original title for display (meaningful contextual title from highlights)
+                "reason": reason  # Reason for this clip
             }
+            logger.info(f"📤 Returning clip {clip_number} with title: '{original_title}'")
+            return result
             
         except Exception as e:
             logger.error(f"Error processing clip {clip_number}: {str(e)}", exc_info=True)

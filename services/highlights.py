@@ -64,13 +64,18 @@ class HighlightsService:
         5. Provide a brief reason why this segment is engaging
         6. Create a short, catchy title (2-5 words) that captures the essence of the segment
         
+        CRITICAL: The "title" field must be a SHORT, MEANINGFUL phrase (2-5 words) that summarizes the clip's main point.
+        DO NOT use the actual transcription text or full sentences as the title.
+        Examples of good titles: "Key Point", "Important Info", "Engaging Moment", "Pro Tip", "Main Insight"
+        Examples of BAD titles: "Now that we've had a look at this visually with...", "That's why every single time I post..."
+        
         Only return your response as a valid JSON array with this exact format:
         [
             {{
                 "start_time": <start_time_in_seconds>,
                 "end_time": <end_time_in_seconds>,
                 "reason": "<reason_this_is_a_good_highlight>",
-                "title": "<short_2_to_5_word_title>"
+                "title": "<short_2_to_5_word_title_summary>"
             }},
             ...
         ]
@@ -149,12 +154,27 @@ class HighlightsService:
                             # Validate durations (use backend config)
                             duration = end - start
                             if config.MIN_CLIP_DURATION <= duration <= config.MAX_CLIP_DURATION:
+                                # Extract and validate title
+                                raw_title = highlight.get("title", "Untitled")
+                                # If title looks like transcription text (too long or contains sentence structure), generate a better one
+                                if len(raw_title.split()) > 8 or raw_title.endswith('...') or raw_title.count('.') > 1:
+                                    # Title is likely transcription text, use reason or generate a generic one
+                                    reason_text = highlight.get("reason", "Interesting segment")
+                                    # Extract key words from reason for a better title
+                                    reason_words = reason_text.split()[:3]
+                                    clean_title = ' '.join(reason_words).title() if reason_words else f"Clip {len(valid_highlights) + 1}"
+                                    logger.warning(f"⚠️ Title '{raw_title}' looks like transcription text, using generated title: '{clean_title}'")
+                                    title = clean_title
+                                else:
+                                    title = raw_title.strip()
+                                
                                 valid_highlights.append({
                                     "start_time": start,
                                     "end_time": end,
                                     "reason": highlight.get("reason", "Interesting segment"),
-                                    "title": highlight.get("title", "Untitled")
+                                    "title": title
                                 })
+                                logger.info(f"✅ Validated highlight {len(valid_highlights)}: title='{title}', reason='{highlight.get('reason', 'Interesting segment')}'")
                     
                     if len(valid_highlights) < num_clips:
                         logger.warning(f"Only found {len(valid_highlights)} valid highlights out of {num_clips} requested")
